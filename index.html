@@ -32,7 +32,7 @@
 </head>
   <body>
     <div id="root"></div>
-    <!-- Changed script type to 'text/babel' to enable transpilation -->
-    <script type="text/babel" data-type="module" src="./index.tsx"></script>
+    <!-- Configured Babel to transpile both React (JSX) and TypeScript -->
+    <script type="text/babel" data-type="module" src="./index.tsx" data-presets="react,typescript"></script>
   </body>
 </html>
