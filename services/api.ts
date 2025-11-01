@@ -1,6 +1,6 @@
-import { AppData, Tournament, User, Transaction, TransactionType, TransactionStatus } from '../types';
+import { AppData, Tournament, User, Transaction, TransactionType, TransactionStatus } from '../types.ts';
 
-const STORAGE_key = 'titans_x_tournaments_data';
+const STORAGE_KEY = 'titans_x_tournaments_data';
 
 // Helper to return a deep copy to prevent direct state mutation
 const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
@@ -49,7 +49,7 @@ let db: AppData;
 
 const saveData = () => {
   try {
-    localStorage.setItem(STORAGE_key, JSON.stringify(db));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   } catch (error) {
     console.error("Failed to save data to localStorage", error);
   }
@@ -115,7 +115,7 @@ const migrateData = (data: any): AppData => {
 
 const loadData = () => {
   try {
-    const storedData = localStorage.getItem(STORAGE_key);
+    const storedData = localStorage.getItem(STORAGE_KEY);
     if (storedData) {
       const parsedData = JSON.parse(storedData);
       db = migrateData(parsedData);
@@ -166,6 +166,11 @@ export const api = {
   // Deletes a tournament from the database by its ID.
   deleteTournament: async (id: string): Promise<void> => {
     await delay(400);
+    const tournament = db.tournaments.find(t => t.id === id);
+    if (tournament && tournament.status !== 'Finished') {
+      console.warn("Attempted to delete a tournament that is not finished. Action blocked.");
+      return Promise.resolve(); // Or reject with an error
+    }
     db.tournaments = db.tournaments.filter(t => t.id !== id);
     saveData();
     return Promise.resolve();

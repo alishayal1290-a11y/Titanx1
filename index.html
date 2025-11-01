@@ -17,22 +17,44 @@
         -moz-osx-font-smoothing: grayscale;
       }
     </style>
-<script type="importmap">
+    <!-- SystemJS for in-browser module loading and transpilation -->
+    <script src="https://unpkg.com/systemjs@6.14.3/dist/s.min.js"></script>
+    <script src="https://unpkg.com/systemjs-plugin-babel@0.0.25/plugin-babel.js"></script>
+    <script src="https://unpkg.com/systemjs-plugin-babel@0.0.25/systemjs-babel-build.js"></script>
+    <script type="systemjs-config">
+      {
+        "baseURL": "./",
+        "transpiler": "plugin-babel",
+        "babelOptions": {
+          "react": true,
+          "typescript": true
+        },
+        "meta": {
+          "*.tsx": { "loader": "plugin-babel" },
+          "*.ts": { "loader": "plugin-babel" }
+        },
+        "map": {
+          "plugin-babel": "https://unpkg.com/systemjs-plugin-babel@0.0.25/plugin-babel.js",
+          "systemjs-babel-build": "https://unpkg.com/systemjs-plugin-babel@0.0.25/systemjs-babel-build.js",
+          "react": "https://esm.sh/react@18.2.0",
+          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client"
+        }
+      }
+    </script>
+  <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-    "react/": "https://esm.sh/react@18.2.0/"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
   }
 }
 </script>
-<!-- Add Babel for in-browser JSX/TSX transpilation -->
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
   <body>
     <div id="root"></div>
-    <!-- Configured Babel to transpile both React (JSX) and TypeScript -->
-    <script type="text/babel" data-type="module" src="./index.tsx" data-presets="react,typescript"></script>
+    <script type="systemjs-import">
+      System.import('./index.tsx');
+    </script>
   </body>
 </html>

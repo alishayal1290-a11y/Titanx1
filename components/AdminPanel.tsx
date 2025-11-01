@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { User, Tournament, Transaction, TransactionStatus, TransactionType } from '../types';
-import { AnimatedButton } from './common/AnimatedButton';
-import { Modal } from './common/Modal';
+import { User, Tournament, Transaction, TransactionStatus, TransactionType } from '../types.ts';
+import { AnimatedButton } from './common/AnimatedButton.tsx';
+import { Modal } from './common/Modal.tsx';
 
 interface AdminPanelProps {
   data: {
@@ -53,8 +53,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
     const [type, setType] = useState<'Per Kill' | 'Survival' | '1v1'>('Survival');
     
     const handleSubmit = async () => {
+        const numericEntryFee = parseFloat(entryFee);
+        const numericPrizePool = parseFloat(prizePool);
+
+        if (!name || !game || !schedule) {
+            alert("Please fill out all fields.");
+            return;
+        }
+        if (isNaN(numericEntryFee) || numericEntryFee < 0) {
+            alert("Please enter a valid entry fee.");
+            return;
+        }
+        if (isNaN(numericPrizePool) || numericPrizePool <= 0) {
+            alert("Please enter a valid, positive prize pool.");
+            return;
+        }
+
         setIsSubmitting(true);
-        await onAddTournament({name, game, entryFee: Number(entryFee), prizePool: Number(prizePool), schedule, mode, map, type});
+        await onAddTournament({name, game, entryFee: numericEntryFee, prizePool: numericPrizePool, schedule, mode, map, type});
         setIsSubmitting(false);
         setAddTournamentModalOpen(false);
     }

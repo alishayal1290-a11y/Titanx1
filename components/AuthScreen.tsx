@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { AnimatedButton } from './common/AnimatedButton';
+import { AnimatedButton } from './common/AnimatedButton.tsx';
 
 interface AuthScreenProps {
   onLogin: (email: string, pass: string) => void;

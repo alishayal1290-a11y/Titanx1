@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { User, Tournament, Transaction, TransactionType, TransactionStatus } from '../types';
-import { AnimatedButton } from './common/AnimatedButton';
-import { Modal } from './common/Modal';
-import { WHATSAPP_NUMBER, SADAPAY_NUMBER } from '../constants';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { User, Tournament, Transaction, TransactionType, TransactionStatus } from '../types.ts';
+import { AnimatedButton } from './common/AnimatedButton.tsx';
+import { Modal } from './common/Modal.tsx';
+import { WHATSAPP_NUMBER, SADAPAY_NUMBER } from '../constants.ts';
 
 interface UserPanelProps {
   user: User;
@@ -32,12 +32,25 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (window.lucide) {
       window.lucide.createIcons();
     }
   }, [activeView, tournaments, transactions, isDepositModalOpen, isWithdrawModalOpen, isMenuOpen, isCopied]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+            setIsMenuOpen(false);
+        }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [menuRef]);
 
   const userTransactions = useMemo(() => transactions.filter(t => t.userId === user.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), [transactions, user.id]);
 
@@ -118,13 +131,18 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
     const [screenshot, setScreenshot] = useState<File | null>(null);
 
     const handleDeposit = async () => {
-        if (!amount || !screenshot) {
-            alert("Please provide amount and screenshot.");
+        const numericAmount = parseFloat(amount);
+        if (isNaN(numericAmount) || numericAmount <= 0) {
+            alert("Please enter a valid, positive amount.");
+            return;
+        }
+        if (!screenshot) {
+            alert("Please upload a transaction screenshot.");
             return;
         }
         setIsSubmitting(true);
         const base64Screenshot = await fileToBase64(screenshot);
-        await onRequestDeposit(parseFloat(amount), base64Screenshot);
+        await onRequestDeposit(numericAmount, base64Screenshot);
         setIsSubmitting(false);
         setDepositModalOpen(false);
     }
@@ -150,16 +168,21 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
     const [accountName, setAccountName] = useState('');
 
     const handleWithdraw = async () => {
-        if(!amount || !accountNumber || !accountName) {
-            alert("Please fill all fields.");
+        const numericAmount = parseFloat(amount);
+        if (isNaN(numericAmount) || numericAmount <= 0) {
+            alert("Please enter a valid, positive amount.");
             return;
         }
-        if(parseFloat(amount) > user.walletBalance) {
+        if(!accountNumber || !accountName) {
+            alert("Please fill all account details.");
+            return;
+        }
+        if(numericAmount > user.walletBalance) {
             alert("Insufficient balance.");
             return;
         }
         setIsSubmitting(true);
-        await onRequestWithdraw(method, accountNumber, accountName, parseFloat(amount));
+        await onRequestWithdraw(method, accountNumber, accountName, numericAmount);
         setIsSubmitting(false);
         setWithdrawModalOpen(false);
     }
@@ -327,7 +350,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
                      </p>
                      <p className="text-xs text-gray-500">Wallet</p>
                 </div>
-                <div className="relative">
+                <div ref={menuRef} className="relative">
                     <button 
                       id="menu-button"
                       aria-expanded={isMenuOpen}

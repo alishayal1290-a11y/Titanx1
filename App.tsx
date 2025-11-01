@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api } from './services/api';
-import { AppData, User, Tournament, Transaction, TransactionType, TransactionStatus } from './types';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, REFERRER_BONUS_AMOUNT, NEW_USER_REFERRAL_BONUS_AMOUNT } from './constants';
-import { AuthScreen } from './components/AuthScreen';
-import { UserPanel } from './components/UserPanel';
-import { AdminPanel } from './components/AdminPanel';
-import { Modal } from './components/common/Modal';
-import { AnimatedButton } from './components/common/AnimatedButton';
+import { api } from './services/api.ts';
+import { AppData, User, Tournament, Transaction, TransactionType, TransactionStatus } from './types.ts';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, REFERRER_BONUS_AMOUNT, NEW_USER_REFERRAL_BONUS_AMOUNT } from './constants.ts';
+import { AuthScreen } from './components/AuthScreen.tsx';
+import { UserPanel } from './components/UserPanel.tsx';
+import { AdminPanel } from './components/AdminPanel.tsx';
+import { Modal } from './components/common/Modal.tsx';
+import { AnimatedButton } from './components/common/AnimatedButton.tsx';
 
 // A simple hash function (for demonstration purposes, not for production security)
 const simpleHash = (s: string) => {
