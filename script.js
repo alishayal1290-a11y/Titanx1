@@ -24,8 +24,16 @@
         _db: null,
         _delay: (ms) => new Promise(res => setTimeout(res, ms)),
         _migrateData(data) {
-            data.users = data.users.map(user => ({ matchesPlayed: 0, matchesWon: 0, totalPrizeMoney: 0, ...user }));
-            data.tournaments = data.tournaments.map(t => ({ winnerId: t.winnerId || undefined, ...t }));
+             data.users = data.users.map((user) => ({
+                matchesPlayed: 0,
+                matchesWon: 0,
+                totalPrizeMoney: 0,
+                ...user,
+            }));
+            data.tournaments = data.tournaments.map((t) => ({
+                winnerId: t.winnerId || undefined,
+                 ...t,
+            }));
             return data;
         },
         _loadData() {
@@ -71,19 +79,20 @@
 
     // --- GLOBAL STATE ---
     let state = {
-        data: null,
+        data: { users: [], tournaments: [], transactions: [] },
         isLoading: true,
         currentUser: null,
         isAdmin: false,
         authError: undefined,
         ui: {
+            authView: 'login', // 'login' or 'signup'
             userPanelView: 'tournaments',
             adminPanelTab: 'tournaments',
             isUserMenuOpen: false,
             isSubmitting: false,
-            modal: null, // e.g., { type: 'deposit' } or { type: 'addTournament' }
-            selectedTournament: null,
-            viewingUser: null,
+            modal: null, // e.g., { type: 'deposit' }
+            selectedTournamentId: null,
+            viewingUserId: null,
             viewingScreenshot: null,
         }
     };
@@ -103,20 +112,10 @@
             if (updatedUser) {
                 state.currentUser = updatedUser;
             } else {
-                handleLogout(); return;
+                handleLogout(); return; // User was deleted
             }
         }
         
-        if (state.ui.viewingUser) {
-             const updatedViewingUser = latestData.users.find(u => u.id === state.ui.viewingUser.id);
-             if (updatedViewingUser) state.ui.viewingUser = updatedViewingUser;
-        }
-        
-        if (state.ui.selectedTournament) {
-            const updatedTournament = latestData.tournaments.find(t => t.id === state.ui.selectedTournament.id);
-            if(updatedTournament) state.ui.selectedTournament = updatedTournament;
-        }
-
         if (rerender) render();
     }
 
@@ -125,11 +124,14 @@
 
     const handleLogin = async (email, pass) => {
         state.authError = undefined;
+        const currentData = await api.getData();
+        state.data = currentData; // Ensure data is fresh
+
         if (email === ADMIN_EMAIL && pass === ADMIN_PASSWORD) {
             state.isAdmin = true;
             state.currentUser = { id: 'admin', name: 'Admin', email: ADMIN_EMAIL };
         } else {
-            const user = state.data.users.find(u => u.email === email);
+            const user = currentData.users.find(u => u.email === email);
             if (user && user.passwordHash === simpleHash(pass)) {
                 state.currentUser = user;
                 state.isAdmin = false;
@@ -142,7 +144,8 @@
 
     const handleSignUp = async (name, email, pass, refCode) => {
         state.authError = undefined;
-        let currentData = deepCopy(state.data);
+        let currentData = await api.getData();
+
         if (currentData.users.some(u => u.email === email)) {
             state.authError = "An account with this email already exists.";
             render();
@@ -169,7 +172,7 @@
     };
     
     const handleJoinTournament = async (tournamentId) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         const tournament = currentData.tournaments.find(t => t.id === tournamentId);
         const user = currentData.users.find(u => u.id === state.currentUser.id);
         if (!tournament || !user) return alert("Error finding tournament or user.");
@@ -186,7 +189,7 @@
     };
     
     const handleRequestDeposit = async (amount, screenshot) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         currentData.transactions.push({ id: `txn_${Date.now()}`, userId: state.currentUser.id, type: TransactionType.DEPOSIT, amount, status: TransactionStatus.PENDING, timestamp: new Date().toISOString(), details: { screenshot } });
         await api._setData(currentData);
         state.ui.modal = null;
@@ -195,7 +198,7 @@
     };
 
     const handleRequestWithdraw = async (method, accountNumber, accountName, amount) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         const user = currentData.users.find(u => u.id === state.currentUser.id);
         if (amount > user.walletBalance) return alert("Insufficient balance.");
         
@@ -207,7 +210,7 @@
     };
     
     const handleAddTournament = async (t) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         const newTournament = { ...t, id: `t_${Date.now()}`, participants: [], status: 'Upcoming' };
         currentData.tournaments.push(newTournament);
         await api._setData(currentData);
@@ -217,14 +220,14 @@
     
     const handleDeleteTournament = async (id) => {
         if (!window.confirm("Are you sure? This cannot be undone.")) return;
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         currentData.tournaments = currentData.tournaments.filter(t => t.id !== id);
         await api._setData(currentData);
         await refreshData();
     };
 
     const handleUpdateTournamentCreds = async (id, creds) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         const tournament = currentData.tournaments.find(t => t.id === id);
         if (tournament) tournament.credentials = creds;
         await api._setData(currentData);
@@ -233,7 +236,7 @@
     };
     
     const handleUpdateTournamentStatus = async (id, newStatus) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         const tournament = currentData.tournaments.find(t => t.id === id);
         if (tournament) tournament.status = newStatus;
         await api._setData(currentData);
@@ -241,7 +244,7 @@
     };
     
     const handleSetTournamentWinner = async (tournamentId, winnerId) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         const tournament = currentData.tournaments.find(t => t.id === tournamentId);
         const winner = currentData.users.find(u => u.id === winnerId);
         if (!tournament || !winner) return alert("Error: Tournament or winner not found.");
@@ -264,7 +267,7 @@
     };
 
     const handleTransactionApproval = async (id, newStatus) => {
-        const currentData = deepCopy(state.data);
+        const currentData = await api.getData();
         const transaction = currentData.transactions.find(t => t.id === id);
         if (!transaction) return;
         
@@ -279,7 +282,7 @@
                         user.walletBalance -= transaction.amount;
                     } else {
                         transaction.status = TransactionStatus.REJECTED;
-                        alert("Withdrawal rejected due to insufficient funds.");
+                        alert("Withdrawal rejected due to insufficient funds at time of approval.");
                     }
                 }
             }
@@ -288,82 +291,29 @@
         await refreshData();
     };
     
-    // --- HTML TEMPLATE GENERATORS ---
+    // --- HTML TEMPLATE HELPERS ---
 
     const getAnimatedButtonHTML = (text, { variant = 'primary', type = 'button', className = '', id = '', action = '', dataset = {} } = {}) => {
         const base = "px-6 py-3 font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-75 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2";
         const variants = { primary: 'bg-amber-500 text-slate-900 hover:bg-amber-600 focus:ring-amber-400', secondary: 'bg-slate-700 text-white hover:bg-slate-800 focus:ring-slate-600', danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500' };
         const dataAttrs = Object.entries(dataset).map(([k, v]) => `data-${k}="${v}"`).join(' ');
-        return `<button type="${type}" id="${id}" class="${base} ${variants[variant]} ${className}" data-action="${action}" ${dataAttrs}>${text}</button>`;
-    };
-    
-    // A map of all modal content generators
-    const modalContent = {
-        deposit: () => `
-            <div class="space-y-4">
-                <p class="text-sm text-gray-600">Send payment to SadaPay:</p>
-                <div class="bg-gray-100 p-3 rounded-lg text-center"><p class="font-mono font-bold text-lg text-gray-800">${SADAPAY_NUMBER}</p></div>
-                <form id="deposit-form" class="space-y-4">
-                    <input type="number" name="amount" placeholder="Amount (TX)" required class="w-full px-4 py-2 border rounded-lg"/>
-                    <input type="file" name="screenshot" accept="image/*" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"/>
-                    ${getAnimatedButtonHTML('Submit Deposit Request', { type: 'submit', className: 'w-full' })}
-                </form>
-            </div>`,
-        withdraw: () => {
-            const user = state.currentUser;
-            return `
-            <div class="space-y-4">
-                <form id="withdraw-form" class="space-y-4">
-                    <input type="number" name="amount" placeholder="Amount (TX)" max="${user.walletBalance}" required class="w-full px-4 py-2 border rounded-lg"/>
-                    <select name="method" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Easypaisa</option><option>Jazzcash</option></select>
-                    <input type="text" name="accountNumber" placeholder="Account Number" required class="w-full px-4 py-2 border rounded-lg"/>
-                    <input type="text" name="accountName" placeholder="Account Name" required class="w-full px-4 py-2 border rounded-lg"/>
-                    ${getAnimatedButtonHTML('Submit Withdraw Request', { type: 'submit', className: 'w-full' })}
-                </form>
-            </div>`;
-        },
-        addTournament: () => `
-            <form id="add-tournament-form" class="space-y-4">
-                <input type="text" name="name" placeholder="Tournament Name" required class="w-full px-4 py-2 border rounded-lg"/>
-                <input type="text" name="game" value="Free Fire" placeholder="Game" required class="w-full px-4 py-2 border rounded-lg"/>
-                <select name="mode" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Squad</option><option>Duo</option><option>Solo</option></select>
-                <select name="map" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Bermuda</option><option>Kalahari</option><option>Solara</option><option>Nextera</option></select>
-                <select name="type" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Survival</option><option>Per Kill</option><option>1v1</option></select>
-                <input type="number" name="entryFee" placeholder="Entry Fee (TX)" required class="w-full px-4 py-2 border rounded-lg"/>
-                <input type="number" name="prizePool" placeholder="Prize Pool (TX)" required class="w-full px-4 py-2 border rounded-lg"/>
-                <input type="datetime-local" name="schedule" required class="w-full px-4 py-2 border rounded-lg"/>
-                ${getAnimatedButtonHTML('Add Tournament', { type: 'submit', className: 'w-full' })}
-            </form>`,
-        setCreds: () => `
-            <form id="set-creds-form" class="space-y-4">
-                <input type="text" name="roomId" placeholder="Room ID" required class="w-full px-4 py-2 border rounded-lg"/>
-                <input type="text" name="roomPass" placeholder="Room Password" required class="w-full px-4 py-2 border rounded-lg"/>
-                ${getAnimatedButtonHTML('Set Credentials', { type: 'submit', className: 'w-full' })}
-            </form>`,
-        setWinner: () => {
-            const t = state.ui.selectedTournament;
-            const participants = t.participants.map(pId => state.data.users.find(u => u.id === pId)).filter(Boolean);
-            if (participants.length === 0) return `<p class="text-red-500">No participants in this tournament.</p>`;
-            return `
-            <form id="set-winner-form" class="space-y-4">
-                <label class="block text-sm font-medium text-gray-700">Select Winner</label>
-                <select name="winnerId" class="w-full px-4 py-2 border rounded-lg bg-white">
-                    ${participants.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-                </select>
-                ${getAnimatedButtonHTML('Confirm Winner', { type: 'submit', className: 'w-full' })}
-            </form>`;
-        },
-        viewScreenshot: () => `<img src="${state.ui.viewingScreenshot}" alt="Deposit Screenshot" class="w-full h-auto rounded-lg" />`,
+        const disabled = state.ui.isSubmitting ? 'disabled' : '';
+        const btnText = state.ui.isSubmitting ? 'Submitting...' : text;
+        return `<button type="${type}" id="${id}" class="${base} ${variants[variant]} ${className}" data-action="${action}" ${dataAttrs} ${disabled}>${btnText}</button>`;
     };
 
-    const modalTitles = {
-        deposit: 'Make a Deposit',
-        withdraw: 'Request a Withdrawal',
-        addTournament: 'Add New Tournament',
-        setCreds: () => `Credentials for ${state.ui.selectedTournament?.name}`,
-        setWinner: () => `Set Winner for ${state.ui.selectedTournament?.name}`,
-        viewScreenshot: 'Deposit Screenshot'
-    };
+    const getModalHTML = (title, content) => `
+        <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 animate-fade-in">
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md m-4 transform transition-all duration-300 ease-in-out scale-95 animate-scale-in">
+            <div class="flex justify-between items-center p-5 border-b border-gray-200">
+              <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+              <button data-action="close-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+            <div class="p-6">${content}</div>
+          </div>
+        </div>`;
     
     const getTransactionStatusChip = (status) => {
         const colors = { pending: 'yellow', approved: 'green', rejected: 'red' };
@@ -371,84 +321,52 @@
         return `<span class="px-2 py-1 text-xs font-semibold text-${color}-800 bg-${color}-100 rounded-full">${status}</span>`;
     };
     
-    // --- MAIN RENDER FUNCTION ---
-    function render() {
-        if (state.isLoading) {
-            root.innerHTML = `<div class="min-h-screen flex items-center justify-center bg-gray-50"><div class="w-16 h-16 border-4 border-amber-500 border-solid rounded-full animate-spin" style="border-top-color: transparent;"></div></div>`;
-            return;
-        }
-
-        let html = '';
-        if (state.isAdmin) html = renderAdminPanel();
-        else if (state.currentUser) html = renderUserPanel();
-        else html = renderAuthScreen();
-        
-        // Append modal if open
-        if (state.ui.modal) {
-            const modalType = state.ui.modal.type;
-            const titleFunc = modalTitles[modalType];
-            const title = typeof titleFunc === 'function' ? titleFunc() : titleFunc;
-            const contentFunc = modalContent[modalType];
-            const content = contentFunc ? contentFunc() : '';
-            html += `
-            <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-              <div class="bg-white rounded-xl shadow-2xl w-full max-w-md m-4 transform transition-all duration-300 ease-in-out scale-95 animate-scale-in">
-                <div class="flex justify-between items-center p-5 border-b border-gray-200">
-                  <h3 class="text-xl font-bold text-gray-800">${title}</h3>
-                  <button data-action="close-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                  </button>
-                </div>
-                <div class="p-6">${content}</div>
-              </div>
-            </div>`;
-        }
-
-        root.innerHTML = html;
-        refreshIcons();
-    }
-    
-    // All other render functions... (Auth, User Panel, Admin Panel)
-    // These functions generate HTML strings based on the current state.
+    // --- RENDER FUNCTIONS (VIEWS) ---
     
     function renderAuthScreen() {
+        const { authView, isSubmitting } = state.ui;
         const error = state.authError ? `<p class="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">${state.authError}</p>` : '';
         const input = (type, name, placeholder, required = true) => `<input type="${type}" name="${name}" placeholder="${placeholder}" ${required ? 'required' : ''} class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition"/>`;
-        return `
-        <div class="min-h-screen bg-gray-100 flex flex-col justify-center items-center p-4">
-          <div class="max-w-md w-full mx-auto">
-            <div class="text-center mb-8"><h1 class="text-4xl font-bold text-slate-800">Titans <span class="text-amber-500">X</span></h1><p class="text-gray-500 mt-2">Your Ultimate Tournament Platform</p></div>
-            <div id="auth-form-container" class="bg-white p-8 rounded-2xl shadow-lg">
-                <div class="mb-6"><h2 class="text-2xl font-bold text-gray-800">Welcome Back!</h2><p class="text-gray-500">Sign in to continue</p></div>
-                ${error}
+        
+        let formContent, header, footer;
+
+        if (authView === 'login') {
+            header = `<div class="mb-6"><h2 class="text-2xl font-bold text-gray-800">Welcome Back!</h2><p class="text-gray-500">Sign in to continue</p></div>`;
+            formContent = `
                 <form id="login-form" class="space-y-6">
                     ${input('email', 'email', 'Email Address')}
                     ${input('password', 'password', 'Password')}
                     ${getAnimatedButtonHTML('Login', { type: 'submit', className: 'w-full' })}
-                </form>
-                <p class="text-center text-sm text-gray-600 mt-6">Don't have an account? <button data-action="show-signup" class="font-semibold text-amber-600 hover:underline ml-1">Sign Up</button></p>
+                </form>`;
+            footer = `<p class="text-center text-sm text-gray-600 mt-6">Don't have an account? <button data-action="show-signup" class="font-semibold text-amber-600 hover:underline ml-1">Sign Up</button></p>`;
+        } else { // signup
+            header = `<div class="mb-6"><h2 class="text-2xl font-bold text-gray-800">Create Account</h2><p class="text-gray-500">Join the community</p></div>`;
+            formContent = `
+                <form id="signup-form" class="space-y-4">
+                    ${input('text', 'name', 'Full Name')}
+                    ${input('email', 'email', 'Email Address')}
+                    ${input('password', 'password', 'Password')}
+                    ${input('text', 'refCode', 'Referral Code (Optional)', false)}
+                    ${getAnimatedButtonHTML('Sign Up', { type: 'submit', className: 'w-full' })}
+                </form>`;
+            footer = `<p class="text-center text-sm text-gray-600 mt-6">Already have an account? <button data-action="show-login" class="font-semibold text-amber-600 hover:underline ml-1">Login</button></p>`;
+        }
+
+        return `
+        <div class="min-h-screen bg-gray-100 flex flex-col justify-center items-center p-4">
+          <div class="max-w-md w-full mx-auto">
+            <div class="text-center mb-8"><h1 class="text-4xl font-bold text-slate-800">Titans <span class="text-amber-500">X</span></h1><p class="text-gray-500 mt-2">Your Ultimate Tournament Platform</p></div>
+            <div class="bg-white p-8 rounded-2xl shadow-lg">
+                ${header}
+                ${error}
+                ${formContent}
+                ${footer}
             </div>
           </div>
         </div>`;
     }
 
-    function renderSignUpForm() {
-        const error = state.authError ? `<p class="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">${state.authError}</p>` : '';
-        const input = (type, name, placeholder, required = true) => `<input type="${type}" name="${name}" placeholder="${placeholder}" ${required ? 'required' : ''} class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition"/>`;
-        document.getElementById('auth-form-container').innerHTML = `
-            <div class="mb-6"><h2 class="text-2xl font-bold text-gray-800">Create Account</h2><p class="text-gray-500">Join the community</p></div>
-            ${error}
-            <form id="signup-form" class="space-y-4">
-                ${input('text', 'name', 'Full Name')}
-                ${input('email', 'email', 'Email Address')}
-                ${input('password', 'password', 'Password')}
-                ${input('text', 'refCode', 'Referral Code (Optional)', false)}
-                ${getAnimatedButtonHTML('Sign Up', { type: 'submit', className: 'w-full' })}
-            </form>
-            <p class="text-center text-sm text-gray-600 mt-6">Already have an account? <button data-action="show-login" class="font-semibold text-amber-600 hover:underline ml-1">Login</button></p>
-        `;
-    }
-
+    // ... All other render functions for User and Admin panels...
     function renderUserPanel() {
         const user = state.currentUser;
         const view = state.ui.userPanelView;
@@ -476,7 +394,7 @@
                     <div class="relative"><button data-action="toggle-user-menu" class="p-2 rounded-full hover:bg-gray-100"><i data-lucide="more-vertical" class="w-6 h-6 text-gray-700"></i></button>${menu}</div>
                 </div>
             </header>
-            <main class="${view === 'profile' ? 'pt-16' : ''}">${content}</main>
+            <main class="transition-all duration-300 ${view === 'profile' ? 'pt-16' : ''}">${content}</main>
             <nav class="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] flex justify-around border-t border-gray-200">
                 ${navItem('swords', 'Tournaments', 'tournaments')}
                 ${navItem('wallet', 'Wallet', 'wallet')}
@@ -485,11 +403,10 @@
         </div>`;
     }
     
-    // ... all other sub-render functions for User and Admin panels...
     function renderUserTournaments(){
         const active = state.data.tournaments.filter(t => t.status !== 'Finished');
         const user = state.currentUser;
-        if (active.length === 0) return `<div class="p-4"><div class="text-center py-10 bg-white rounded-lg shadow-md"><p class="text-gray-500">No tournaments right now.</p></div></div>`;
+        if (active.length === 0) return `<div class="p-4"><div class="text-center py-10 bg-white rounded-lg shadow-md"><p class="text-gray-500">No upcoming or ongoing tournaments right now.</p><p class="text-sm text-gray-400 mt-2">Please check back later!</p></div></div>`;
         return `
         <div class="p-4 space-y-4">
           <h2 class="text-2xl font-bold text-gray-800">Available Tournaments</h2>
@@ -499,8 +416,8 @@
                 ? (joined ? `<button class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold" disabled>Joined</button>` : getAnimatedButtonHTML('Join Now', { action: 'join-tournament', dataset: { tournamentid: t.id }, className: 'text-sm py-2 px-4' }))
                 : `<span class="px-3 py-2 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-800">Ongoing</span>`;
             const creds = joined ? `
-                <div class="mt-4 border-t pt-4"><h4 class="font-semibold text-gray-700">Credentials</h4>
-                ${t.credentials ? `<div class="text-sm mt-2 p-3 bg-amber-50 rounded-lg"><p><strong>ID:</strong> ${t.credentials.id}</p><p><strong>Password:</strong> ${t.credentials.pass}</p></div>` : `<p class="text-sm text-gray-500 italic mt-2">Credentials will be provided before the match starts.</p>`}
+                <div class="mt-4 border-t pt-4"><h4 class="font-semibold text-gray-700">Tournament Credentials</h4>
+                ${t.credentials ? `<div class="text-sm mt-2 p-3 bg-amber-50 rounded-lg"><p><strong>ID:</strong> ${t.credentials.id}</p><p><strong>Password:</strong> ${t.credentials.pass}</p></div>` : `<p class="text-sm text-gray-500 italic mt-2">Credentials will be provided by the admin before the match starts.</p>`}
                 </div>` : '';
             return `
             <div class="bg-white p-5 rounded-lg shadow-md">
@@ -512,8 +429,8 @@
                     <span class="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-full"><i data-lucide="users" class="w-3 h-3 text-gray-400"></i>${t.mode}</span>
                     <span class="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-full"><i data-lucide="map" class="w-3 h-3 text-gray-400"></i>${t.map}</span>
                   </div>
-                  <p class="text-sm text-gray-500">Prize Pool: ${t.prizePool.toLocaleString()} TX</p>
-                  <p class="text-sm text-gray-500">Entry Fee: ${t.entryFee} TX</p>
+                  <p class="text-sm text-gray-500 flex items-center">Prize Pool: <i data-lucide="coins" class="w-4 h-4 mx-1 text-amber-500"></i> ${t.prizePool.toLocaleString()} TX</p>
+                  <p class="text-sm text-gray-500 flex items-center">Entry Fee: <i data-lucide="coins" class="w-4 h-4 mx-1 text-amber-500"></i> ${t.entryFee} TX</p>
                   <p class="text-sm text-gray-500">Schedule: ${new Date(t.schedule).toLocaleString()}</p>
                 </div>
                 <div class="flex-shrink-0 ml-4">${actionBtn}</div>
@@ -526,7 +443,7 @@
     
     function renderUserWallet() {
         const user = state.currentUser;
-        const txns = state.data.transactions.filter(t => t.userId === user.id).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const txns = state.data.transactions.filter(t => t.userId === user.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         return `
         <div class="p-4">
             <div class="bg-slate-800 text-white p-6 rounded-xl shadow-lg mb-6 text-center">
@@ -571,7 +488,7 @@
                 <h3 class="font-bold text-lg text-gray-800">Refer & Earn</h3>
                 <p class="text-sm text-gray-500 mt-1">Share your code and earn bonuses!</p>
                 <div class="my-4 p-3 border-2 border-dashed border-amber-400 bg-amber-50 rounded-lg"><p class="text-2xl font-bold text-amber-600 tracking-widest">${user.referralCode}</p></div>
-                ${getAnimatedButtonHTML('<i data-lucide="copy" class="w-4 h-4"></i> Copy Code', { action: 'copy-ref-code' })}
+                ${getAnimatedButtonHTML('<i data-lucide="copy" class="w-4 h-4"></i> Copy Code', { action: 'copy-ref-code', dataset: { code: user.referralCode } })}
             </div>
         </div>`;
     }
@@ -590,8 +507,11 @@
         <div class="min-h-screen bg-gray-100 p-8">
           <div class="max-w-7xl mx-auto">
             <header class="flex justify-between items-center mb-8">
-              <h1 class="text-3xl font-bold text-gray-800">Admin Panel</h1>
-              ${getAnimatedButtonHTML('Logout', { action: 'logout', variant: 'secondary' })}
+                <div class="flex items-center gap-4">
+                    <h1 class="text-3xl font-bold text-gray-800">Admin Panel</h1>
+                    <div class="flex items-center gap-1 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full mt-1"><div class="w-2 h-2 bg-green-500 rounded-full"></div><span>Online</span></div>
+                </div>
+                ${getAnimatedButtonHTML('Logout', { action: 'logout', variant: 'secondary' })}
             </header>
             <div class="flex border-b border-gray-200 mb-6">
                 ${TabButton('Tournaments', 'tournaments')}
@@ -627,16 +547,16 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                 ${tournaments.map(t => `
                     <tr>
-                        <td class="px-6 py-4 text-sm font-medium text-gray-900">${t.name}<div class="text-xs text-gray-500">${t.game}</div></td>
-                        <td class="px-6 py-4 text-sm text-gray-500">Fee: ${t.entryFee} TX<br>Prize: ${t.prizePool} TX</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">${t.name}<div class="text-xs text-gray-500">${t.game}</div></td>
+                        <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">Fee: ${t.entryFee} TX<br>Prize: ${t.prizePool} TX</td>
                         <td class="px-6 py-4 text-sm text-gray-500">${t.participants.length}</td>
                         <td class="px-6 py-4 text-sm text-center">${getStatusChip(t)}</td>
-                        <td class="px-6 py-4 text-sm font-medium space-x-2">
-                            ${t.status === 'Upcoming' ? `<button data-action="start-tournament" data-id="${t.id}" class="text-blue-600 hover:text-blue-900">Start</button>` : ''}
-                            ${t.status === 'Ongoing' ? `<button data-action="finish-tournament" data-id="${t.id}" class="text-green-600 hover:text-green-900">Finish</button>` : ''}
-                            ${t.status === 'Finished' && !t.winnerId ? `<button data-action="open-modal" data-type="setWinner" data-tournamentid="${t.id}" class="text-purple-600 hover:text-purple-900">Set Winner</button>` : ''}
-                            <button data-action="open-modal" data-type="setCreds" data-tournamentid="${t.id}" class="text-amber-600 hover:text-amber-900">Creds</button>
-                            <button data-action="delete-tournament" data-id="${t.id}" class="text-red-600 hover:text-red-900 ${t.status !== 'Finished' ? 'opacity-50' : ''}" ${t.status !== 'Finished' ? 'disabled' : ''}>Delete</button>
+                        <td class="px-6 py-4 text-sm font-medium space-x-2 whitespace-nowrap">
+                            ${t.status === 'Upcoming' ? `<button data-action="start-tournament" data-id="${t.id}" class="text-blue-600 hover:text-blue-900 font-semibold">Start</button>` : ''}
+                            ${t.status === 'Ongoing' ? `<button data-action="finish-tournament" data-id="${t.id}" class="text-green-600 hover:text-green-900 font-semibold">Finish</button>` : ''}
+                            ${t.status === 'Finished' && !t.winnerId ? `<button data-action="open-modal" data-type="setWinner" data-tournamentid="${t.id}" class="text-purple-600 hover:text-purple-900 font-semibold">Set Winner</button>` : ''}
+                            <button data-action="open-modal" data-type="setCreds" data-tournamentid="${t.id}" class="text-amber-600 hover:text-amber-900 font-semibold">Credentials</button>
+                            <button data-action="delete-tournament" data-id="${t.id}" class="text-red-600 hover:text-red-900 font-semibold ${t.status !== 'Finished' ? 'opacity-50 cursor-not-allowed' : ''}" ${t.status !== 'Finished' ? 'disabled' : ''}>Delete</button>
                         </td>
                     </tr>
                 `).join('')}
@@ -646,26 +566,27 @@
     }
     
     function renderAdminUsers() {
-        const user = state.ui.viewingUser;
-        if (user) {
+        const viewingUser = state.data.users.find(u => u.id === state.ui.viewingUserId);
+        if (viewingUser) {
+            const user = viewingUser;
             const referrer = user.referredBy ? state.data.users.find(u => u.referralCode.toLowerCase() === user.referredBy.toLowerCase()) : null;
-            const userTxns = state.data.transactions.filter(t => t.userId === user.id).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const userTxns = state.data.transactions.filter(t => t.userId === user.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
             const InfoRow = (icon, label, value) => `<div class="flex items-center text-sm mb-2"><i data-lucide="${icon}" class="w-4 h-4 mr-3 text-gray-400"></i><span class="text-gray-600 font-medium">${label}:</span><span class="text-gray-800 ml-auto font-semibold">${value}</span></div>`;
             return `
-            <div><button data-action="admin-back-to-users" class="flex items-center gap-2 text-amber-600 font-semibold mb-6 hover:underline"><i data-lucide="arrow-left" class="w-4 h-4"></i> Back</button>
+            <div><button data-action="admin-back-to-users" class="flex items-center gap-2 text-amber-600 font-semibold mb-6 hover:underline"><i data-lucide="arrow-left" class="w-4 h-4"></i> Back to All Users</button>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="md:col-span-1 bg-white p-6 rounded-lg shadow space-y-4"><h3 class="text-xl font-bold">${user.name}</h3><p class="text-sm text-gray-500">${user.email}</p><div class="border-t pt-4">
-                    ${InfoRow('wallet', 'Balance', `${user.walletBalance.toFixed(2)} TX`)}
-                    ${InfoRow('gift', 'Ref Code', user.referralCode)}
+                <div class="md:col-span-1 bg-white p-6 rounded-lg shadow space-y-4"><h3 class="text-xl font-bold text-gray-800">${user.name}</h3><p class="text-sm text-gray-500">${user.email}</p><div class="border-t pt-4">
+                    ${InfoRow('wallet', 'Wallet Balance', `${user.walletBalance.toFixed(2)} TX`)}
+                    ${InfoRow('gift', 'Referral Code', user.referralCode)}
                     ${referrer ? InfoRow('user-plus', 'Referred By', referrer.name) : ''}
-                    ${InfoRow('swords', 'Played', user.matchesPlayed)}
-                    ${InfoRow('trophy', 'Won', user.matchesWon)}
+                    ${InfoRow('swords', 'Matches Played', user.matchesPlayed)}
+                    ${InfoRow('trophy', 'Matches Won', user.matchesWon)}
                 </div></div>
-                <div class="md:col-span-2 bg-white p-6 rounded-lg shadow"><h4 class="font-bold mb-4">Transaction History</h4><div class="space-y-3 max-h-96 overflow-y-auto">
+                <div class="md:col-span-2 bg-white p-6 rounded-lg shadow"><h4 class="font-bold text-gray-800 mb-4">Transaction History</h4><div class="space-y-3 max-h-96 overflow-y-auto">
                     ${userTxns.length > 0 ? userTxns.map(t => {
                         const isPos = [TransactionType.DEPOSIT, TransactionType.REFERRAL_BONUS, TransactionType.TOURNAMENT_WIN].includes(t.type);
                         return `<div class="bg-gray-50 p-3 rounded-lg flex justify-between items-center"><div><p class="font-semibold capitalize text-sm">${t.type.replace(/_/g, ' ')}</p><p class="text-xs text-gray-500">${new Date(t.timestamp).toLocaleString()}</p></div><div class="text-right"><p class="font-bold text-sm ${isPos ? 'text-green-600' : 'text-red-600'}">${isPos ? '+' : '-'}${t.amount.toFixed(2)} TX</p>${getTransactionStatusChip(t.status)}</div></div>`
-                    }).join('') : `<p class="text-sm text-gray-500 italic">No transactions.</p>`}
+                    }).join('') : `<p class="text-sm text-gray-500 italic">No transactions found.</p>`}
                 </div></div>
             </div></div>`;
         }
@@ -676,8 +597,8 @@
             </tr></thead>
             <tbody class="bg-white divide-y divide-gray-200">
             ${state.data.users.map(u => `
-                <tr data-action="admin-view-user" data-id="${u.id}" class="cursor-pointer hover:bg-gray-50">
-                    <td class="px-6 py-4 font-medium">${u.name}</td><td class="px-6 py-4 text-gray-500">${u.email}</td><td class="px-6 py-4 text-gray-500 flex items-center"><i data-lucide="coins" class="w-4 h-4 mr-1 text-amber-500"></i>${u.walletBalance.toFixed(2)} TX</td>
+                <tr data-action="admin-view-user" data-id="${u.id}" class="cursor-pointer hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${u.name}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${u.email}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex items-center"><i data-lucide="coins" class="w-4 h-4 mr-1 text-amber-500"></i>${u.walletBalance.toFixed(2)} TX</td>
                 </tr>
             `).join('')}
             </tbody></table>
@@ -686,7 +607,7 @@
     
     function renderAdminTransactions(type) {
         const pending = state.data.transactions.filter(t => t.type === type && t.status === 'pending');
-        const typeName = type.charAt(0).toUpperCase() + type.slice(1);
+        const typeName = type.charAt(0).toUpperCase() + type.slice(1) + 's';
         return `
         <div class="bg-white rounded-lg shadow overflow-x-auto">
             <table class="min-w-full"><thead class="bg-gray-50"><tr>
@@ -700,43 +621,127 @@
                     : `${t.details.method} - ${t.details.accountNumber} (${t.details.accountName})`;
                 return `
                 <tr>
-                    <td class="px-6 py-4 font-medium">${user?.name || 'N/A'}</td><td class="px-6 py-4 text-gray-500">${t.amount.toFixed(2)} TX</td><td class="px-6 py-4 text-sm text-gray-500">${details}</td>
-                    <td class="px-6 py-4 space-x-2"><button data-action="approve-txn" data-id="${t.id}" class="text-green-600 hover:text-green-900">Approve</button><button data-action="reject-txn" data-id="${t.id}" class="text-red-600 hover:text-red-900">Reject</button></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user?.name || 'N/A'}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.amount.toFixed(2)} TX</td><td class="px-6 py-4 text-sm text-gray-500">${details}</td>
+                    <td class="px-6 py-4 whitespace-nowrap space-x-2"><button data-action="approve-txn" data-id="${t.id}" class="text-green-600 hover:text-green-900 font-semibold">Approve</button><button data-action="reject-txn" data-id="${t.id}" class="text-red-600 hover:text-red-900 font-semibold">Reject</button></td>
                 </tr>`;
-            }).join('') : `<tr><td colspan="4" class="text-center py-4 text-gray-500">No pending ${typeName}s.</td></tr>`}
+            }).join('') : `<tr><td colspan="4" class="text-center py-4 text-gray-500">No pending ${typeName}.</td></tr>`}
             </tbody></table>
         </div>`;
     }
 
+    // --- MAIN RENDER FUNCTION ---
+    function render() {
+        if (state.isLoading) {
+            root.innerHTML = `<div class="min-h-screen flex items-center justify-center bg-gray-50"><div class="w-16 h-16 border-4 border-amber-500 border-solid rounded-full animate-spin" style="border-top-color: transparent;"></div></div>`;
+            return;
+        }
+
+        let html = '';
+        if (state.isAdmin) html = renderAdminPanel();
+        else if (state.currentUser) html = renderUserPanel();
+        else html = renderAuthScreen();
+        
+        // Append modal if open
+        if (state.ui.modal) {
+            const modalType = state.ui.modal.type;
+            const selectedTournament = state.data.tournaments.find(t => t.id === state.ui.selectedTournamentId);
+
+            const modalContentMap = {
+                deposit: () => `
+                    <form id="deposit-form" class="space-y-4">
+                        <p class="text-sm text-gray-600">Send payment to SadaPay: <strong class="font-mono">${SADAPAY_NUMBER}</strong></p>
+                        <input type="number" name="amount" placeholder="Amount (TX)" required class="w-full px-4 py-2 border rounded-lg"/>
+                        <input type="file" name="screenshot" accept="image/*" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"/>
+                        ${getAnimatedButtonHTML('Submit Deposit Request', { type: 'submit', className: 'w-full' })}
+                    </form>`,
+                withdraw: () => `
+                    <form id="withdraw-form" class="space-y-4">
+                        <input type="number" name="amount" placeholder="Amount (TX)" max="${state.currentUser.walletBalance}" required class="w-full px-4 py-2 border rounded-lg"/>
+                        <select name="method" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Easypaisa</option><option>Jazzcash</option></select>
+                        <input type="text" name="accountNumber" placeholder="Account Number" required class="w-full px-4 py-2 border rounded-lg"/>
+                        <input type="text" name="accountName" placeholder="Account Name" required class="w-full px-4 py-2 border rounded-lg"/>
+                        ${getAnimatedButtonHTML('Submit Withdraw Request', { type: 'submit', className: 'w-full' })}
+                    </form>`,
+                addTournament: () => `
+                    <form id="add-tournament-form" class="space-y-4">
+                        <input type="text" name="name" placeholder="Tournament Name" required class="w-full px-4 py-2 border rounded-lg"/>
+                        <input type="text" name="game" value="Free Fire" placeholder="Game" required class="w-full px-4 py-2 border rounded-lg"/>
+                        <select name="mode" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Squad</option><option>Duo</option><option>Solo</option></select>
+                        <select name="map" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Bermuda</option><option>Kalahari</option><option>Solara</option><option>Nextera</option></select>
+                        <select name="type" class="w-full px-4 py-2 border rounded-lg bg-white"><option>Survival</option><option>Per Kill</option><option>1v1</option></select>
+                        <input type="number" name="entryFee" placeholder="Entry Fee (TX)" required class="w-full px-4 py-2 border rounded-lg"/>
+                        <input type="number" name="prizePool" placeholder="Prize Pool (TX)" required class="w-full px-4 py-2 border rounded-lg"/>
+                        <input type="datetime-local" name="schedule" required class="w-full px-4 py-2 border rounded-lg"/>
+                        ${getAnimatedButtonHTML('Add Tournament', { type: 'submit', className: 'w-full' })}
+                    </form>`,
+                setCreds: () => `
+                    <form id="set-creds-form" class="space-y-4">
+                        <input type="text" name="roomId" placeholder="Room ID" required class="w-full px-4 py-2 border rounded-lg" value="${selectedTournament?.credentials?.id || ''}"/>
+                        <input type="text" name="roomPass" placeholder="Room Password" required class="w-full px-4 py-2 border rounded-lg" value="${selectedTournament?.credentials?.pass || ''}"/>
+                        ${getAnimatedButtonHTML('Set Credentials', { type: 'submit', className: 'w-full' })}
+                    </form>`,
+                setWinner: () => {
+                    const participants = selectedTournament.participants.map(pId => state.data.users.find(u => u.id === pId)).filter(Boolean);
+                    if (participants.length === 0) return `<p class="text-red-500">No participants in this tournament.</p>`;
+                    return `
+                    <form id="set-winner-form" class="space-y-4">
+                        <label class="block text-sm font-medium text-gray-700">Select Winner</label>
+                        <select name="winnerId" class="w-full px-4 py-2 border rounded-lg bg-white">${participants.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+                        ${getAnimatedButtonHTML('Confirm Winner', { type: 'submit', className: 'w-full' })}
+                    </form>`;
+                },
+                viewScreenshot: () => `<img src="${state.ui.viewingScreenshot}" alt="Deposit Screenshot" class="w-full h-auto rounded-lg" />`,
+            };
+
+            const modalTitles = {
+                deposit: 'Make a Deposit',
+                withdraw: 'Request a Withdrawal',
+                addTournament: 'Add New Tournament',
+                setCreds: `Credentials for ${selectedTournament?.name}`,
+                setWinner: `Set Winner for ${selectedTournament?.name}`,
+                viewScreenshot: 'Deposit Screenshot'
+            };
+
+            html += getModalHTML(modalTitles[modalType], modalContentMap[modalType]());
+        }
+
+        root.innerHTML = html;
+        refreshIcons();
+    }
+    
+
     // --- GLOBAL EVENT LISTENERS ---
     document.addEventListener('click', async e => {
         const target = e.target.closest('[data-action]');
-        if (!target) return;
+        if (!target || state.ui.isSubmitting) return;
         
-        const { action, id, view, type, tournamentid, tab, screenshot } = target.dataset;
-        e.preventDefault(); // Prevent default for buttons inside forms
+        const { action, id, view, type, tournamentid, tab, screenshot, code } = target.dataset;
 
         switch (action) {
             case 'logout': handleLogout(); break;
-            case 'show-signup': renderSignUpForm(); break;
-            case 'show-login': render(); break; // Renders the default login form
+            case 'show-signup': state.ui.authView = 'signup'; render(); break;
+            case 'show-login': state.ui.authView = 'login'; render(); break;
             case 'toggle-user-menu': state.ui.isUserMenuOpen = !state.ui.isUserMenuOpen; render(); break;
             case 'navigate-user': state.ui.userPanelView = view; render(); break;
-            case 'navigate-admin': state.ui.adminPanelTab = tab; state.ui.viewingUser = null; render(); break;
-            case 'copy-ref-code': navigator.clipboard.writeText(state.currentUser.referralCode).then(() => alert('Copied!')); break;
+            case 'navigate-admin': state.ui.adminPanelTab = tab; state.ui.viewingUserId = null; render(); break;
+            case 'copy-ref-code': navigator.clipboard.writeText(code).then(() => alert('Referral code copied!')); break;
             case 'open-modal':
-                if (tournamentid) state.ui.selectedTournament = state.data.tournaments.find(t => t.id === tournamentid) || null;
+                if (tournamentid) state.ui.selectedTournamentId = tournamentid;
                 if (screenshot) state.ui.viewingScreenshot = screenshot;
                 state.ui.modal = { type };
                 render();
                 break;
-            case 'close-modal': state.ui.modal = null; state.ui.selectedTournament = null; state.ui.viewingScreenshot = null; render(); break;
-            case 'join-tournament': await handleJoinTournament(tournamentid); break;
+            case 'close-modal': state.ui.modal = null; state.ui.selectedTournamentId = null; state.ui.viewingScreenshot = null; render(); break;
+            case 'join-tournament': 
+                state.ui.isSubmitting = true; render();
+                await handleJoinTournament(tournamentid); 
+                state.ui.isSubmitting = false; render();
+                break;
             case 'start-tournament': await handleUpdateTournamentStatus(id, 'Ongoing'); break;
             case 'finish-tournament': await handleUpdateTournamentStatus(id, 'Finished'); break;
             case 'delete-tournament': await handleDeleteTournament(id); break;
-            case 'admin-view-user': state.ui.viewingUser = state.data.users.find(u => u.id === id); render(); break;
-            case 'admin-back-to-users': state.ui.viewingUser = null; render(); break;
+            case 'admin-view-user': state.ui.viewingUserId = id; render(); break;
+            case 'admin-back-to-users': state.ui.viewingUserId = null; render(); break;
             case 'approve-txn': await handleTransactionApproval(id, TransactionStatus.APPROVED); break;
             case 'reject-txn': await handleTransactionApproval(id, TransactionStatus.REJECTED); break;
         }
@@ -747,35 +752,46 @@
         const form = e.target;
         const data = new FormData(form);
         const entries = Object.fromEntries(data.entries());
-        state.ui.isSubmitting = true; // Could add loading indicators
         
-        switch (form.id) {
-            case 'login-form': await handleLogin(entries.email, entries.password); break;
-            case 'signup-form': await handleSignUp(entries.name, entries.email, entries.password, entries.refCode); break;
-            case 'deposit-form':
-                const screenshotFile = form.querySelector('input[type="file"]').files[0];
-                if (!screenshotFile) return alert("Screenshot is required.");
-                const base64 = await fileToBase64(screenshotFile);
-                await handleRequestDeposit(parseFloat(entries.amount), base64);
-                break;
-            case 'withdraw-form': await handleRequestWithdraw(entries.method, entries.accountNumber, entries.accountName, parseFloat(entries.amount)); break;
-            case 'add-tournament-form':
-                const newTournament = { name: entries.name, game: entries.game, mode: entries.mode, map: entries.map, type: entries.type, entryFee: Number(entries.entryFee), prizePool: Number(entries.prizePool), schedule: entries.schedule };
-                await handleAddTournament(newTournament);
-                break;
-            case 'set-creds-form': await handleUpdateTournamentCreds(state.ui.selectedTournament.id, { id: entries.roomId, pass: entries.roomPass }); break;
-            case 'set-winner-form': await handleSetTournamentWinner(state.ui.selectedTournament.id, entries.winnerId); break;
+        state.ui.isSubmitting = true;
+        render(); // Re-render to show disabled buttons/loading state
+
+        try {
+            switch (form.id) {
+                case 'login-form': await handleLogin(entries.email, entries.password); break;
+                case 'signup-form': await handleSignUp(entries.name, entries.email, entries.password, entries.refCode); break;
+                case 'deposit-form':
+                    const screenshotFile = form.querySelector('input[type="file"]').files[0];
+                    if (!screenshotFile) { alert("Screenshot is required."); break; }
+                    const base64 = await fileToBase64(screenshotFile);
+                    await handleRequestDeposit(parseFloat(entries.amount), base64);
+                    break;
+                case 'withdraw-form': await handleRequestWithdraw(entries.method, entries.accountNumber, entries.accountName, parseFloat(entries.amount)); break;
+                case 'add-tournament-form':
+                    const newTournament = { name: entries.name, game: entries.game, mode: entries.mode, map: entries.map, type: entries.type, entryFee: Number(entries.entryFee), prizePool: Number(entries.prizePool), schedule: entries.schedule };
+                    await handleAddTournament(newTournament);
+                    break;
+                case 'set-creds-form': await handleUpdateTournamentCreds(state.ui.selectedTournamentId, { id: entries.roomId, pass: entries.roomPass }); break;
+                case 'set-winner-form': await handleSetTournamentWinner(state.ui.selectedTournamentId, entries.winnerId); break;
+            }
+        } catch (error) {
+            console.error("Form submission error:", error);
+            alert("An unexpected error occurred. Please try again.");
+        } finally {
+             state.ui.isSubmitting = false;
+             // The handler functions should call refreshData which triggers a render.
+             // If a handler doesn't (e.g. on error), we might need an explicit render call here.
+             // For now, most handlers do, so this should be fine.
         }
-        state.ui.isSubmitting = false;
     });
 
     // --- INITIALIZATION ---
     async function init() {
         state.isLoading = true;
         render();
-        await refreshData(false); // Load data without re-rendering yet
+        await refreshData(false);
         state.isLoading = false;
-        render(); // Final render with loaded data
+        render();
     }
     
     document.addEventListener('DOMContentLoaded', init);
