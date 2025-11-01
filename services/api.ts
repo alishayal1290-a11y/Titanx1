@@ -56,28 +56,27 @@ const saveData = () => {
 };
 
 const migrateData = (data: any): AppData => {
-  const safeData = {
-    users: data.users || [],
-    tournaments: data.tournaments || [],
-    transactions: data.transactions || [],
-  };
+  // Add a guard against invalid data structures (e.g., null, string from localStorage)
+  if (typeof data !== 'object' || data === null) {
+    return deepCopy(defaultDb);
+  }
 
-  // For users, ensure stats fields exist
-  safeData.users = safeData.users.map((user: any) => ({
+  const users = Array.isArray(data.users) ? data.users.map((user: any) => ({
       ...user,
       matchesPlayed: user.matchesPlayed || 0,
       matchesWon: user.matchesWon || 0,
       totalPrizeMoney: user.totalPrizeMoney || 0,
-  }));
+  })) : [];
 
-  // For tournaments, ensure new fields exist
-  safeData.tournaments = safeData.tournaments.map((tournament: any) => ({
+  const tournaments = Array.isArray(data.tournaments) ? data.tournaments.map((tournament: any) => ({
       ...tournament,
       game: tournament.game || 'Free Fire', // Default to Free Fire if missing
       winnerId: tournament.winnerId || undefined,
-  }));
+  })) : [];
+  
+  const transactions = Array.isArray(data.transactions) ? data.transactions : [];
 
-  return safeData as AppData;
+  return { users, tournaments, transactions };
 }
 
 const loadData = () => {
