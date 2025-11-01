@@ -1,4 +1,4 @@
-import { AppData, Tournament, User, Transaction } from '../types';
+import { AppData, Tournament, User, Transaction, TransactionType, TransactionStatus } from '../types';
 
 const STORAGE_key = 'titans_x_tournaments_data';
 
@@ -56,28 +56,62 @@ const saveData = () => {
 };
 
 const migrateData = (data: any): AppData => {
-  // Add a guard against invalid data structures (e.g., null, string from localStorage)
+  // Guard against invalid top-level data
   if (typeof data !== 'object' || data === null) {
     return deepCopy(defaultDb);
   }
 
-  const users = Array.isArray(data.users) ? data.users.map((user: any) => ({
-      ...user,
-      matchesPlayed: user.matchesPlayed || 0,
-      matchesWon: user.matchesWon || 0,
-      totalPrizeMoney: user.totalPrizeMoney || 0,
-  })) : [];
+  // Safely process users
+  const users = Array.isArray(data.users) 
+    ? data.users.filter(u => u && typeof u === 'object').map((user: any): User => ({
+        id: user.id || `user_${Date.now()}_${Math.random()}`,
+        name: user.name || 'Unknown User',
+        email: user.email || '',
+        passwordHash: user.passwordHash || '',
+        referralCode: user.referralCode || '',
+        referredBy: user.referredBy,
+        walletBalance: typeof user.walletBalance === 'number' ? user.walletBalance : 0,
+        joinedTournaments: Array.isArray(user.joinedTournaments) ? user.joinedTournaments : [],
+        matchesPlayed: user.matchesPlayed || 0,
+        matchesWon: user.matchesWon || 0,
+        totalPrizeMoney: user.totalPrizeMoney || 0,
+      }))
+    : [];
 
-  const tournaments = Array.isArray(data.tournaments) ? data.tournaments.map((tournament: any) => ({
-      ...tournament,
-      game: tournament.game || 'Free Fire', // Default to Free Fire if missing
-      winnerId: tournament.winnerId || undefined,
-  })) : [];
+  // Safely process tournaments
+  const tournaments = Array.isArray(data.tournaments) 
+    ? data.tournaments.filter(t => t && typeof t === 'object').map((tournament: any): Tournament => ({
+        id: tournament.id || `t_${Date.now()}_${Math.random()}`,
+        name: tournament.name || 'Unnamed Tournament',
+        game: tournament.game || 'Free Fire',
+        mode: tournament.mode || 'Squad',
+        map: tournament.map || 'Bermuda',
+        type: tournament.type || 'Survival',
+        entryFee: typeof tournament.entryFee === 'number' ? tournament.entryFee : 0,
+        prizePool: typeof tournament.prizePool === 'number' ? tournament.prizePool : 0,
+        schedule: tournament.schedule || new Date().toISOString(),
+        status: tournament.status || 'Upcoming',
+        participants: Array.isArray(tournament.participants) ? tournament.participants : [],
+        credentials: tournament.credentials,
+        winnerId: tournament.winnerId,
+      }))
+    : [];
   
-  const transactions = Array.isArray(data.transactions) ? data.transactions : [];
+  // Safely process transactions
+  const transactions = Array.isArray(data.transactions) 
+    ? data.transactions.filter(t => t && typeof t === 'object').map((transaction: any): Transaction => ({
+        id: transaction.id || `txn_${Date.now()}_${Math.random()}`,
+        userId: transaction.userId || '',
+        type: transaction.type || TransactionType.DEPOSIT,
+        amount: typeof transaction.amount === 'number' ? transaction.amount : 0,
+        status: transaction.status || TransactionStatus.PENDING,
+        timestamp: transaction.timestamp || new Date().toISOString(),
+        details: transaction.details && typeof transaction.details === 'object' ? transaction.details : {},
+      }))
+    : [];
 
   return { users, tournaments, transactions };
-}
+};
 
 const loadData = () => {
   try {
@@ -116,7 +150,7 @@ export const api = {
   },
   
   // Creates a new tournament and adds it to the database.
-  createTournament: async (t: Omit<Tournament, 'id' | 'participants' | 'status'>): Promise<Tournament> => {
+  createTournament: async (t: Omit<Tournament, 'id' | 'participants' | 'status' | 'winnerId'>): Promise<Tournament> => {
     await delay(400);
     const newTournament: Tournament = {
         ...t,
