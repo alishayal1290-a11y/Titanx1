@@ -39,7 +39,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
     if (window.lucide) {
       window.lucide.createIcons();
     }
-  });
+  }, [activeTab, data, viewingUser, viewingScreenshot, isAddTournamentModalOpen, isCredsModalOpen, isWinnerModalOpen]);
 
   const AddTournamentModal = () => {
     const [name, setName] = useState('');

@@ -36,7 +36,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
     if (window.lucide) {
       window.lucide.createIcons();
     }
-  });
+  }, [activeView, tournaments, transactions, isDepositModalOpen, isWithdrawModalOpen, isMenuOpen]);
 
   const userTransactions = useMemo(() => transactions.filter(t => t.userId === user.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), [transactions, user.id]);
 
