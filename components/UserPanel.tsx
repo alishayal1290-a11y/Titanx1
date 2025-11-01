@@ -31,12 +31,13 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
   const [isWithdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     if (window.lucide) {
       window.lucide.createIcons();
     }
-  }, [activeView, tournaments, transactions, isDepositModalOpen, isWithdrawModalOpen, isMenuOpen]);
+  }, [activeView, tournaments, transactions, isDepositModalOpen, isWithdrawModalOpen, isMenuOpen, isCopied]);
 
   const userTransactions = useMemo(() => transactions.filter(t => t.userId === user.id).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), [transactions, user.id]);
 
@@ -44,6 +45,14 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
     setIsSubmitting(true);
     await onJoinTournament(tournamentId);
     setIsSubmitting(false);
+  };
+
+  const handleCopyCode = () => {
+    if (isCopied) return;
+    navigator.clipboard.writeText(user.referralCode).then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2500);
+    });
   };
 
   const renderTournaments = () => {
@@ -248,8 +257,12 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
           <div className="my-4 p-3 border-2 border-dashed border-amber-400 bg-amber-50 rounded-lg">
             <p className="text-2xl font-bold text-amber-600 tracking-widest">{user.referralCode}</p>
           </div>
-          <AnimatedButton onClick={() => navigator.clipboard.writeText(user.referralCode)}>
-            <i data-lucide="copy" className="w-4 h-4"></i> Copy Code
+          <AnimatedButton onClick={handleCopyCode}>
+            {isCopied ? (
+                <><i data-lucide="check" className="w-4 h-4"></i> Copied!</>
+              ) : (
+                <><i data-lucide="copy" className="w-4 h-4"></i> Copy Code</>
+            )}
           </AnimatedButton>
         </div>
       </div>

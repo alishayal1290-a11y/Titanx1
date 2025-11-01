@@ -5,6 +5,8 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, REFERRER_BONUS_AMOUNT, NEW_USER_REFERRAL_B
 import { AuthScreen } from './components/AuthScreen';
 import { UserPanel } from './components/UserPanel';
 import { AdminPanel } from './components/AdminPanel';
+import { Modal } from './components/common/Modal';
+import { AnimatedButton } from './components/common/AnimatedButton';
 
 // A simple hash function (for demonstration purposes, not for production security)
 const simpleHash = (s: string) => {
@@ -23,6 +25,8 @@ const App: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [authError, setAuthError] = useState<string | undefined>(undefined);
+    const [infoModal, setInfoModal] = useState<{ title: string; message: string } | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; } | null>(null);
 
     const handleLogout = useCallback(() => {
         setCurrentUser(null);
@@ -148,17 +152,17 @@ const App: React.FC = () => {
         const user = currentData.users.find(u => u.id === currentUser.id);
 
         if (!tournament || !user) {
-            alert("An error occurred. Please try again.");
+            setInfoModal({title: "Error", message: "An error occurred. Please try again."});
             return;
         }
         
         if (tournament.status !== 'Upcoming') {
-            alert("This tournament is not open for registration.");
+            setInfoModal({title: "Registration Closed", message: "This tournament is not open for registration."});
             return;
         }
 
         if (user.walletBalance < tournament.entryFee) {
-            alert("Insufficient wallet balance to join.");
+            setInfoModal({title: "Insufficient Balance", message: "You do not have enough funds in your wallet to join this tournament."});
             return;
         }
         
@@ -197,7 +201,7 @@ const App: React.FC = () => {
         currentData.transactions.push(newTransaction);
         await api._setData(currentData);
         await refreshData();
-        alert("Deposit request submitted. Please wait for admin approval.");
+        setInfoModal({title: "Request Submitted", message: "Your deposit request has been submitted. Please wait for admin approval."});
     };
 
     const handleRequestWithdraw = async (method: 'Easypaisa' | 'Jazzcash', accountNumber: string, accountName: string, amount: number) => {
@@ -215,7 +219,7 @@ const App: React.FC = () => {
         currentData.transactions.push(newTransaction);
         await api._setData(currentData);
         await refreshData();
-        alert("Withdrawal request submitted. Please wait for admin approval.");
+        setInfoModal({title: "Request Submitted", message: "Your withdrawal request has been submitted. Please wait for admin approval."});
     };
     
     // Admin functions
@@ -255,12 +259,12 @@ const App: React.FC = () => {
         const winner = currentData.users.find(u => u.id === winnerId);
 
         if (!tournament || !winner) {
-            alert("Error setting winner. Tournament or user not found.");
+            setInfoModal({ title: "Error", message: "Error setting winner. Tournament or user not found." });
             return;
         }
 
         if (tournament.winnerId) {
-            alert("A winner has already been set for this tournament.");
+            setInfoModal({ title: "Winner Already Set", message: "A winner has already been set for this tournament." });
             return;
         }
 
@@ -294,7 +298,7 @@ const App: React.FC = () => {
 
         await api._setData(currentData);
         await refreshData();
-        alert(`${winner.name} has been set as the winner!`);
+        setInfoModal({ title: "Winner Set!", message: `${winner.name} has been set as the winner!` });
     };
 
     const handleTransactionApproval = async (id: string, newStatus: TransactionStatus) => {
@@ -315,7 +319,7 @@ const App: React.FC = () => {
                       user.walletBalance -= transaction.amount;
                     } else {
                       transaction.status = TransactionStatus.REJECTED;
-                      alert("Withdrawal rejected due to insufficient funds at time of approval.");
+                      setInfoModal({ title: "Approval Failed", message: "Withdrawal rejected due to insufficient funds at time of approval."});
                     }
                 }
             }
@@ -324,6 +328,36 @@ const App: React.FC = () => {
         await api._setData(currentData);
         await refreshData();
     }
+
+    const showConfirmModal = (title: string, message: string, onConfirm: () => void) => {
+        setConfirmModal({ title, message, onConfirm });
+    };
+
+    const renderModals = () => (
+        <>
+            {infoModal && (
+                <Modal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal.title}>
+                    <p className="text-gray-600">{infoModal.message}</p>
+                    <AnimatedButton onClick={() => setInfoModal(null)} className="w-full mt-6">
+                        Close
+                    </AnimatedButton>
+                </Modal>
+            )}
+            {confirmModal && (
+                <Modal isOpen={!!confirmModal} onClose={() => setConfirmModal(null)} title={confirmModal.title}>
+                    <p className="text-gray-600">{confirmModal.message}</p>
+                    <div className="flex gap-4 mt-6">
+                        <AnimatedButton onClick={() => setConfirmModal(null)} variant="secondary" className="w-full">
+                            Cancel
+                        </AnimatedButton>
+                        <AnimatedButton onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }} className="w-full">
+                            Confirm
+                        </AnimatedButton>
+                    </div>
+                </Modal>
+            )}
+        </>
+    );
 
     if (isLoading) {
         return (
@@ -336,31 +370,41 @@ const App: React.FC = () => {
         );
     }
 
-    if (isAdmin) {
-        return <AdminPanel 
-                    data={data} 
-                    onLogout={handleLogout} 
-                    onAddTournament={handleAddTournament}
-                    onDeleteTournament={handleDeleteTournament}
-                    onUpdateTournamentCreds={handleUpdateTournamentCreds}
-                    onUpdateTournamentStatus={handleUpdateTournamentStatus}
-                    onSetTournamentWinner={handleSetTournamentWinner}
-                    onApproveTransaction={(id) => handleTransactionApproval(id, TransactionStatus.APPROVED)}
-                    onRejectTransaction={(id) => handleTransactionApproval(id, TransactionStatus.REJECTED)}
-                />;
-    }
-    if (currentUser) {
-        return <UserPanel 
-                    user={currentUser} 
-                    tournaments={data.tournaments} 
-                    transactions={data.transactions}
-                    onLogout={handleLogout} 
-                    onJoinTournament={handleJoinTournament}
-                    onRequestDeposit={handleRequestDeposit}
-                    onRequestWithdraw={handleRequestWithdraw}
-                />;
-    }
-    return <AuthScreen onLogin={handleLogin} onSignUp={handleSignUp} error={authError} />;
+    const renderContent = () => {
+        if (isAdmin) {
+            return <AdminPanel 
+                        data={data} 
+                        onLogout={handleLogout} 
+                        onAddTournament={handleAddTournament}
+                        onDeleteTournament={handleDeleteTournament}
+                        onUpdateTournamentCreds={handleUpdateTournamentCreds}
+                        onUpdateTournamentStatus={handleUpdateTournamentStatus}
+                        onSetTournamentWinner={handleSetTournamentWinner}
+                        onApproveTransaction={(id) => handleTransactionApproval(id, TransactionStatus.APPROVED)}
+                        onRejectTransaction={(id) => handleTransactionApproval(id, TransactionStatus.REJECTED)}
+                        onConfirm={showConfirmModal}
+                    />;
+        }
+        if (currentUser) {
+            return <UserPanel 
+                        user={currentUser} 
+                        tournaments={data.tournaments} 
+                        transactions={data.transactions}
+                        onLogout={handleLogout} 
+                        onJoinTournament={handleJoinTournament}
+                        onRequestDeposit={handleRequestDeposit}
+                        onRequestWithdraw={handleRequestWithdraw}
+                    />;
+        }
+        return <AuthScreen onLogin={handleLogin} onSignUp={handleSignUp} error={authError} />;
+    };
+
+    return (
+        <>
+            {renderContent()}
+            {renderModals()}
+        </>
+    )
 };
 
 declare global {

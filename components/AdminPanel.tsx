@@ -17,9 +17,10 @@ interface AdminPanelProps {
   onApproveTransaction: (id: string) => Promise<void>;
   onRejectTransaction: (id: string) => Promise<void>;
   onSetTournamentWinner: (tournamentId: string, winnerId: string) => Promise<void>;
+  onConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTournament, onDeleteTournament, onUpdateTournamentCreds, onUpdateTournamentStatus, onApproveTransaction, onRejectTransaction, onSetTournamentWinner }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTournament, onDeleteTournament, onUpdateTournamentCreds, onUpdateTournamentStatus, onApproveTransaction, onRejectTransaction, onSetTournamentWinner, onConfirm }) => {
   const [activeTab, setActiveTab] = useState<'tournaments' | 'users' | 'deposits' | 'withdrawals'>('tournaments');
   const [isAddTournamentModalOpen, setAddTournamentModalOpen] = useState(false);
   const [isCredsModalOpen, setCredsModalOpen] = useState(false);
@@ -155,10 +156,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
     )
   }
 
-  const handleDeleteTournament = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this tournament? This action cannot be undone.")) {
-      await onDeleteTournament(id);
-    }
+  const handleDeleteTournament = (id: string) => {
+    onConfirm(
+      "Delete Tournament",
+      "Are you sure you want to delete this tournament? This action cannot be undone.",
+      () => onDeleteTournament(id)
+    );
   }
 
   const getTournamentStatusChip = (status: 'Upcoming' | 'Ongoing' | 'Finished', winner?: User | null) => {
