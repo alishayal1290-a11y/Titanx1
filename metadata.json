@@ -1,0 +1,5 @@
+{
+  "name": "Titanx",
+  "description": "A modern, animated tournament application with user and admin panels. Manage tournaments, wallets, and user referrals, with all data stored locally.",
+  "requestFramePermissions": []
+}

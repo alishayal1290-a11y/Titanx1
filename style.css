@@ -1,0 +1,11 @@
+body {
+  background-color: #f0f2f5;
+  font-family: 'Inter', sans-serif;
+}
+@keyframes scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out forwards;
+}
