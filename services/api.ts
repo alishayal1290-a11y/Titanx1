@@ -56,8 +56,14 @@ const saveData = () => {
 };
 
 const migrateData = (data: any): AppData => {
+  const safeData = {
+    users: data.users || [],
+    tournaments: data.tournaments || [],
+    transactions: data.transactions || [],
+  };
+
   // For users, ensure stats fields exist
-  data.users = data.users.map((user: any) => ({
+  safeData.users = safeData.users.map((user: any) => ({
       ...user,
       matchesPlayed: user.matchesPlayed || 0,
       matchesWon: user.matchesWon || 0,
@@ -65,13 +71,13 @@ const migrateData = (data: any): AppData => {
   }));
 
   // For tournaments, ensure new fields exist
-  data.tournaments = data.tournaments.map((tournament: any) => ({
+  safeData.tournaments = safeData.tournaments.map((tournament: any) => ({
       ...tournament,
       game: tournament.game || 'Free Fire', // Default to Free Fire if missing
       winnerId: tournament.winnerId || undefined,
   }));
 
-  return data;
+  return safeData as AppData;
 }
 
 const loadData = () => {
