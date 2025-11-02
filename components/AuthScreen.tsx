@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AnimatedButton } from './common/AnimatedButton.tsx';
 
@@ -33,8 +32,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onSignUp, error
         </div>
         <div className="bg-white p-8 rounded-2xl shadow-lg">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">{isLogin ? 'Welcome Back!' : 'Create Account'}</h2>
-            <p className="text-gray-500">{isLogin ? 'Sign in to continue' : 'Join the community'}</p>
+            <h2 className="text-2xl font-bold text-gray-800">{isLogin ? 'Welcome Back!' : 'Create a New Account'}</h2>
+            <p className="text-gray-500">{isLogin ? 'Sign in to continue.' : 'Join the community.'}</p>
           </div>
           
           {error && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</p>}
@@ -53,14 +52,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onSignUp, error
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition"/>
             )}
             <AnimatedButton type="submit" className="w-full">
-              {isLogin ? 'Login' : 'Sign Up'}
+              {isLogin ? 'Log In' : 'Sign Up'}
             </AnimatedButton>
           </form>
 
           <p className="text-center text-sm text-gray-600 mt-6">
             {isLogin ? "Don't have an account?" : "Already have an account?"}
             <button onClick={() => setIsLogin(!isLogin)} className="font-semibold text-amber-600 hover:underline ml-1">
-              {isLogin ? 'Sign Up' : 'Login'}
+              {isLogin ? 'Sign Up' : 'Log In'}
             </button>
           </p>
         </div>

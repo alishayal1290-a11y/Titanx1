@@ -57,7 +57,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
         const numericPrizePool = parseFloat(prizePool);
 
         if (!name || !game || !schedule) {
-            alert("Please fill out all fields.");
+            alert("Please fill all fields.");
             return;
         }
         if (isNaN(numericEntryFee) || numericEntryFee < 0) {
@@ -163,7 +163,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
                         <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                 </select>
-                {participants.length === 0 && <p className="text-sm text-red-500">This tournament has no participants.</p>}
+                {participants.length === 0 && <p className="text-sm text-red-500">There are no participants in this tournament.</p>}
                 <AnimatedButton onClick={handleSubmit} className="w-full" disabled={isSubmitting || participants.length === 0}>
                   {isSubmitting ? 'Setting...' : 'Confirm Winner'}
                 </AnimatedButton>
@@ -183,7 +183,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
   const getTournamentStatusChip = (status: 'Upcoming' | 'Ongoing' | 'Finished', winner?: User | null) => {
      if (status === 'Finished' && winner) {
         return <div className="flex flex-col">
-            <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full mb-1">{status}</span>
+            <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full mb-1">Finished</span>
             <span className="text-xs text-gray-600 font-semibold flex items-center justify-center">
                 <i data-lucide="trophy" className="w-3 h-3 mr-1 text-amber-500"></i>
                 {winner.name}
@@ -192,17 +192,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
      }
     switch (status) {
       case 'Upcoming':
-        return <span className="px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">Upcoming</span>;
       case 'Ongoing':
-        return <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">Ongoing</span>;
       case 'Finished':
-        return <span className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 rounded-full">Finished</span>;
     }
   }
 
   const renderTournaments = () => (
     <div>
-      <AnimatedButton onClick={() => setAddTournamentModalOpen(true)} className="mb-4">Add Tournament</AnimatedButton>
+      <AnimatedButton onClick={() => setAddTournamentModalOpen(true)} className="mb-4">Add New Tournament</AnimatedButton>
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="min-w-full">
           <thead className="bg-gray-50">
@@ -234,14 +234,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                   {t.status === 'Upcoming' && <button onClick={() => onUpdateTournamentStatus(t.id, 'Ongoing')} className="text-blue-600 hover:text-blue-900 font-semibold">Start</button>}
-                  {t.status === 'Ongoing' && <button onClick={() => onUpdateTournamentStatus(t.id, 'Finished')} className="text-green-600 hover:text-green-900 font-semibold">Finish</button>}
+                  {t.status === 'Ongoing' && <button onClick={() => onUpdateTournamentStatus(t.id, 'Finished')} className="text-green-600 hover:text-green-900 font-semibold">End</button>}
                   {t.status === 'Finished' && !t.winnerId && <button onClick={() => { setSelectedTournament(t); setWinnerModalOpen(true);}} className="text-purple-600 hover:text-purple-900 font-semibold">Set Winner</button>}
-                  <button onClick={() => { setSelectedTournament(t); setCredsModalOpen(true);}} className="text-amber-600 hover:text-amber-900 font-semibold">Credentials</button>
+                  <button onClick={() => { setSelectedTournament(t); setCredsModalOpen(true);}} className="text-amber-600 hover:text-amber-900 font-semibold">Creds</button>
                   <button 
                     onClick={() => handleDeleteTournament(t.id)} 
                     className={`text-red-600 hover:text-red-900 font-semibold ${t.status !== 'Finished' ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={t.status !== 'Finished'}
-                    title={t.status !== 'Finished' ? 'Can only delete finished tournaments.' : 'Delete Tournament'}
+                    title={t.status !== 'Finished' ? 'Only finished tournaments can be deleted.' : 'Delete Tournament'}
                   >Delete</button>
                 </td>
               </tr>
@@ -253,13 +253,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
   );
   
   const getTransactionStatusChip = (status: TransactionStatus) => {
+    const statusText: { [key in TransactionStatus]: string } = {
+        [TransactionStatus.PENDING]: 'Pending',
+        [TransactionStatus.APPROVED]: 'Approved',
+        [TransactionStatus.REJECTED]: 'Rejected',
+    };
     switch (status) {
       case TransactionStatus.PENDING:
-        return <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">{statusText[status]}</span>;
       case TransactionStatus.APPROVED:
-        return <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">{statusText[status]}</span>;
       case TransactionStatus.REJECTED:
-        return <span className="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">{statusText[status]}</span>;
     }
   }
 
@@ -302,7 +307,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ data, onLogout, onAddTou
                         ))}
                         </ul>
                     ) : (
-                        <p className="text-sm text-gray-500 italic">No tournaments joined yet.</p>
+                        <p className="text-sm text-gray-500 italic">Not joined in any tournaments yet.</p>
                     )}
                 </div>
 

@@ -132,7 +132,7 @@ const App: React.FC = () => {
                 };
                 currentData.transactions.push(referrerBonusTransaction);
             } else {
-                setAuthError("Invalid referral code provided, but account created.");
+                setAuthError("Invalid referral code provided, but account was created.");
             }
         }
 

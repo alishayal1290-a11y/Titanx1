@@ -67,7 +67,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
         setTimeout(() => setIsCopied(false), 2500);
     });
   };
-
+  
   const renderTournaments = () => {
     const activeTournaments = tournaments.filter(t => t.status !== 'Finished');
     return (
@@ -118,7 +118,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
         </div>
       )) : (
         <div className="text-center py-10 bg-white rounded-lg shadow-md">
-            <p className="text-gray-500">No upcoming or ongoing tournaments right now.</p>
+            <p className="text-gray-500">No upcoming or ongoing tournaments at the moment.</p>
             <p className="text-sm text-gray-400 mt-2">Please check back later!</p>
         </div>
       )}
@@ -137,7 +137,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
             return;
         }
         if (!screenshot) {
-            alert("Please upload a transaction screenshot.");
+            alert("Please upload a screenshot of the transaction.");
             return;
         }
         setIsSubmitting(true);
@@ -174,7 +174,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
             return;
         }
         if(!accountNumber || !accountName) {
-            alert("Please fill all account details.");
+            alert("Please fill in all account details.");
             return;
         }
         if(numericAmount > user.walletBalance) {
@@ -196,19 +196,28 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
             </select>
             <input type="text" placeholder="Account Number" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} className="w-full px-4 py-2 border rounded-lg"/>
             <input type="text" placeholder="Account Name" value={accountName} onChange={e => setAccountName(e.target.value)} className="w-full px-4 py-2 border rounded-lg"/>
-            <AnimatedButton onClick={handleWithdraw} className="w-full" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Withdraw Request'}</AnimatedButton>
+            <AnimatedButton onClick={handleWithdraw} className="w-full" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Withdrawal Request'}</AnimatedButton>
         </div>
     );
   }
+  
+  const translateTransactionType = (type: TransactionType) => {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
 
   const getTransactionStatusChip = (status: TransactionStatus) => {
+    const statusText: { [key in TransactionStatus]: string } = {
+        [TransactionStatus.PENDING]: 'Pending',
+        [TransactionStatus.APPROVED]: 'Approved',
+        [TransactionStatus.REJECTED]: 'Rejected',
+    };
     switch (status) {
       case TransactionStatus.PENDING:
-        return <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">{statusText[status]}</span>;
       case TransactionStatus.APPROVED:
-        return <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">{statusText[status]}</span>;
       case TransactionStatus.REJECTED:
-        return <span className="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">{status}</span>;
+        return <span className="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">{statusText[status]}</span>;
     }
   }
 
@@ -231,7 +240,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
                  return (
                     <div key={t.id} className="bg-white p-4 rounded-lg shadow-sm flex justify-between items-center">
                         <div>
-                            <p className="font-semibold capitalize">{t.type.replace('_', ' ')}</p>
+                            <p className="font-semibold capitalize">{translateTransactionType(t.type)}</p>
                             <p className="text-xs text-gray-500">{new Date(t.timestamp).toLocaleString()}</p>
                         </div>
                         <div className="text-right">
@@ -393,11 +402,11 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
         
         <BottomNavBar />
         
-        <Modal isOpen={isDepositModalOpen} onClose={() => setDepositModalOpen(false)} title="Make a Deposit">
+        <Modal isOpen={isDepositModalOpen} onClose={() => setDepositModalOpen(false)} title="Deposit Funds">
            <DepositModalContent />
         </Modal>
 
-        <Modal isOpen={isWithdrawModalOpen} onClose={() => setWithdrawModalOpen(false)} title="Request a Withdrawal">
+        <Modal isOpen={isWithdrawModalOpen} onClose={() => setWithdrawModalOpen(false)} title="Request Withdrawal">
             <WithdrawModalContent />
         </Modal>
     </div>
