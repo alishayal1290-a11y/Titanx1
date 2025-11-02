@@ -1,0 +1,21 @@
+/* Global Styles */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f9fafb; /* Tailwind gray-50 */
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Spinner Animation Helper */
+.border-t-transparent {
+  border-top-color: transparent;
+}
+
+/* General Transition for UI elements for a smoother feel */
+* {
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}

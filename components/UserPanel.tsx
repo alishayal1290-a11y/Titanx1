@@ -35,12 +35,6 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, tournaments, transac
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (window.lucide) {
-      window.lucide.createIcons();
-    }
-  }, [activeView, tournaments, transactions, isDepositModalOpen, isWithdrawModalOpen, isMenuOpen, isCopied]);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
         if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
             setIsMenuOpen(false);
